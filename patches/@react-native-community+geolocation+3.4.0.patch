@@ -1,0 +1,27 @@
+diff --git a/node_modules/@react-native-community/geolocation/android/src/main/java/com/reactnativecommunity/geolocation/PlayServicesLocationManager.java b/node_modules/@react-native-community/geolocation/android/src/main/java/com/reactnativecommunity/geolocation/PlayServicesLocationManager.java
+--- a/node_modules/@react-native-community/geolocation/android/src/main/java/com/reactnativecommunity/geolocation/PlayServicesLocationManager.java
++++ b/node_modules/@react-native-community/geolocation/android/src/main/java/com/reactnativecommunity/geolocation/PlayServicesLocationManager.java
+@@ -161,7 +161,8 @@
+                 Location location = locationResult.getLastLocation();
+ 
+                 if (location == null) {
+-                    callbackHolder.error(PositionError.buildError(PositionError.POSITION_UNAVAILABLE, "No location provided (FusedLocationProvider/lastLocation)."));
++                    // patched: ignore null intermediate results from FusedLocationProvider
++                    // previously emitted POSITION_UNAVAILABLE immediately
+                     return;
+                 }
+ 
+@@ -173,9 +174,10 @@
+ 
+             @Override
+             public void onLocationAvailability(@NonNull LocationAvailability locationAvailability) {
+-                if (!locationAvailability.isLocationAvailable()) {
+-                    callbackHolder.error(PositionError.buildError(PositionError.POSITION_UNAVAILABLE, "Location not available (FusedLocationProvider/lastLocation)."));
+-                }
++                // patched via patch-package: ignore transient unavailability
++                // previously: if (!locationAvailability.isLocationAvailable()) callbackHolder.error("Location not available (FusedLocationProvider/lastLocation).")
++                // This check caused immediate POSITION_UNAVAILABLE errors when getLastLocation
++                // was null/stale and the fused provider had not yet delivered its first fix.
+             }
+         };
+     }
