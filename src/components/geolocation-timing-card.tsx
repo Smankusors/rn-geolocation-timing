@@ -1,5 +1,14 @@
 import { useState } from 'react';
-import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Linking,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+} from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -40,6 +49,33 @@ export function GeolocationTimingCard() {
 
   const onMeasureCached = async () => {
     await measureGetCurrentPosition({ enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 });
+  };
+
+  const openMaps = async (lat: number, lng: number, label?: string) => {
+    const q = `${lat},${lng}`;
+    const encodedLabel = label ? encodeURIComponent(label) : undefined;
+    let url: string;
+
+    if (Platform.OS === 'ios') {
+      // Apple Maps – works on iOS and falls back to Google Maps in browser
+      url = `http://maps.apple.com/?q=${encodedLabel ?? q}&ll=${q}`;
+    } else if (Platform.OS === 'android') {
+      // geo: intent prefers Google Maps if installed
+      url = `geo:${q}?q=${q}${label ? `(${encodedLabel})` : ''}`;
+      // check if geo: is supported, fallback to https
+      const can = await Linking.canOpenURL(url);
+      if (!can) {
+        url = `https://www.google.com/maps/search/?api=1&query=${q}`;
+      }
+    } else {
+      url = `https://www.google.com/maps/search/?api=1&query=${q}`;
+    }
+
+    try {
+      await Linking.openURL(url);
+    } catch (e) {
+      Alert.alert('Cannot open maps', String(e));
+    }
   };
 
   return (
@@ -125,9 +161,25 @@ export function GeolocationTimingCard() {
             provider <ThemedText type="code">{lastEntry.locationProvider}</ThemedText>
           </ThemedText>
           {lastEntry.position ? (
-            <ThemedText type="small">
-              {lastEntry.position.coords.latitude.toFixed(6)}, {lastEntry.position.coords.longitude.toFixed(6)} · ±{lastEntry.position.coords.accuracy.toFixed(1)} m
-            </ThemedText>
+            <>
+              <ThemedText type="small">
+                {lastEntry.position.coords.latitude.toFixed(6)}, {lastEntry.position.coords.longitude.toFixed(6)} · ±{lastEntry.position.coords.accuracy.toFixed(1)} m
+              </ThemedText>
+              <Pressable
+                onPress={() =>
+                  openMaps(
+                    lastEntry.position!.coords.latitude,
+                    lastEntry.position!.coords.longitude,
+                    'Measured location'
+                  )
+                }
+                style={[styles.mapsButton, { backgroundColor: theme.backgroundSelected }]}
+              >
+                <Text style={[styles.mapsButtonText, { color: theme.text }]}>
+                  {Platform.OS === 'ios' ? 'Open in Apple Maps' : Platform.OS === 'android' ? 'Open in Google Maps' : 'Open in Maps'}
+                </Text>
+              </Pressable>
+            </>
           ) : (
             <ThemedText type="small" style={{ color: '#d73a49' }}>
               Error {lastEntry.error?.code}: {lastEntry.error?.message}
@@ -154,6 +206,15 @@ export function GeolocationTimingCard() {
                   {e.locationProvider}
                   {e.error ? ` · ${e.error.message.slice(0, 60)}` : ''}
                 </ThemedText>
+                {e.position && (
+                  <Pressable
+                    onPress={() => openMaps(e.position!.coords.latitude, e.position!.coords.longitude)}
+                    style={[styles.smallMapsButton, { backgroundColor: theme.backgroundSelected }]}
+                    hitSlop={8}
+                  >
+                    <Text style={[styles.smallMapsButtonText, { color: theme.text }]}>Maps</Text>
+                  </Pressable>
+                )}
               </ThemedView>
             ))}
           </ScrollView>
@@ -256,5 +317,25 @@ const styles = StyleSheet.create({
     fontSize: 12,
     minWidth: 90,
     textAlign: 'right',
+  },
+  mapsButton: {
+    marginTop: 6,
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mapsButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  smallMapsButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
+  smallMapsButtonText: {
+    fontSize: 11,
+    fontWeight: '600',
   },
 });
