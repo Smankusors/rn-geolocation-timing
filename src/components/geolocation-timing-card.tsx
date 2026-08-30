@@ -14,23 +14,18 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { LocationProvider, useGeolocationTiming } from '@/hooks/useGeolocationTiming';
-
-const PROVIDERS: LocationProvider[] = ['playServices', 'android', 'auto'];
+import { useGeolocationTiming } from '@/hooks/useGeolocationTiming';
 
 export function GeolocationTimingCard() {
   const theme = useTheme();
   const {
-    provider,
-    setProvider,
     entries,
     isMeasuring,
-    permissionStatus,
     requestAuthorization,
     measureGetCurrentPosition,
     clearEntries,
     lastEntry,
-  } = useGeolocationTiming('playServices');
+  } = useGeolocationTiming();
 
   const [authBusy, setAuthBusy] = useState(false);
 
@@ -44,11 +39,7 @@ export function GeolocationTimingCard() {
   };
 
   const onMeasure = async () => {
-    await measureGetCurrentPosition({ enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
-  };
-
-  const onMeasureCached = async () => {
-    await measureGetCurrentPosition({ enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 });
+    await measureGetCurrentPosition();
   };
 
   const openMaps = async (lat: number, lng: number, label?: string) => {
@@ -57,12 +48,9 @@ export function GeolocationTimingCard() {
     let url: string;
 
     if (Platform.OS === 'ios') {
-      // Apple Maps – works on iOS and falls back to Google Maps in browser
       url = `http://maps.apple.com/?q=${encodedLabel ?? q}&ll=${q}`;
     } else if (Platform.OS === 'android') {
-      // geo: intent prefers Google Maps if installed
       url = `geo:${q}?q=${q}${label ? `(${encodedLabel})` : ''}`;
-      // check if geo: is supported, fallback to https
       const can = await Linking.canOpenURL(url);
       if (!can) {
         url = `https://www.google.com/maps/search/?api=1&query=${q}`;
@@ -85,46 +73,6 @@ export function GeolocationTimingCard() {
         @react-native-community/geolocation · getCurrentPosition with fused provider
       </ThemedText>
 
-      {Platform.OS === 'android' && (
-        <ThemedView style={[styles.row, { backgroundColor: 'transparent' }]}>
-          <ThemedText type="small">Location provider:</ThemedText>
-          <ThemedView style={[styles.providerRow, { backgroundColor: 'transparent' }]}>
-            {PROVIDERS.map((p) => {
-              const active = p === provider;
-              return (
-                <Pressable
-                  key={p}
-                  onPress={() => setProvider(p)}
-                  style={[
-                    styles.chip,
-                    {
-                      backgroundColor: active ? theme.backgroundSelected : theme.background,
-                      borderColor: active ? theme.text : theme.backgroundSelected,
-                    },
-                  ]}
-                >
-                  <Text style={[styles.chipText, { color: theme.text }]}>{p}</Text>
-                  {active && provider === 'playServices' && (
-                    <Text style={[styles.chipSub, { color: theme.textSecondary }]}> (Fused)</Text>
-                  )}
-                </Pressable>
-              );
-            })}
-          </ThemedView>
-        </ThemedView>
-      )}
-
-      {Platform.OS === 'android' && provider !== 'playServices' && (
-        <ThemedText type="small" style={{ color: theme.textSecondary }}>
-          Tip: select <ThemedText type="code">playServices</ThemedText> to force the Fused Location Provider (Google Play Services).
-        </ThemedText>
-      )}
-
-      <ThemedView style={[styles.row, { backgroundColor: 'transparent' }]}>
-        <ThemedText type="small">Permission: </ThemedText>
-        <ThemedText type="code">{permissionStatus}</ThemedText>
-      </ThemedView>
-
       <ThemedView style={[styles.buttonRow, { backgroundColor: 'transparent' }]}>
         <Pressable
           onPress={onRequestPermission}
@@ -144,21 +92,14 @@ export function GeolocationTimingCard() {
         </Pressable>
       </ThemedView>
 
-      <ThemedView style={[styles.buttonRow, { backgroundColor: 'transparent' }]}>
-        <Pressable onPress={onMeasureCached} disabled={isMeasuring} style={[styles.button, { backgroundColor: theme.background, opacity: isMeasuring ? 0.6 : 1 }]}>
-          <ThemedText type="small">with maximumAge 10s</ThemedText>
-        </Pressable>
-        <Pressable onPress={clearEntries} style={[styles.button, { backgroundColor: theme.background }]}>
-          <ThemedText type="small">Clear</ThemedText>
-        </Pressable>
-      </ThemedView>
+      <Pressable onPress={clearEntries} style={[styles.clearButton, { backgroundColor: theme.background }]}>
+        <ThemedText type="small">Clear</ThemedText>
+      </Pressable>
 
       {lastEntry && (
         <ThemedView style={[styles.lastBox, { borderColor: theme.backgroundSelected, backgroundColor: theme.background }]}>
           <ThemedText type="small">
             Last call: <ThemedText type="code">{lastEntry.durationMs.toFixed(1)} ms</ThemedText>
-            {' · '}
-            provider <ThemedText type="code">{lastEntry.locationProvider}</ThemedText>
           </ThemedText>
           {lastEntry.position ? (
             <>
@@ -185,9 +126,6 @@ export function GeolocationTimingCard() {
               Error {lastEntry.error?.code}: {lastEntry.error?.message}
             </ThemedText>
           )}
-          <ThemedText type="small" style={{ color: theme.textSecondary }}>
-            enableHighAccuracy={String(lastEntry.options.enableHighAccuracy)} · timeout={lastEntry.options.timeout} · maxAge={lastEntry.options.maximumAge}
-          </ThemedText>
         </ThemedView>
       )}
 
@@ -202,8 +140,6 @@ export function GeolocationTimingCard() {
                 </ThemedText>
                 <ThemedText type="small" style={{ flex: 1 }}>
                   {e.position ? `✓ ${e.position.coords.accuracy.toFixed(0)}m` : `✗ ${e.error?.code}`}
-                  {' · '}
-                  {e.locationProvider}
                   {e.error ? ` · ${e.error.message.slice(0, 60)}` : ''}
                 </ThemedText>
                 {e.position && (
@@ -221,14 +157,13 @@ export function GeolocationTimingCard() {
         </ThemedView>
       ) : (
         <ThemedText type="small" style={{ color: theme.textSecondary }}>
-          No measurements yet. Tap getCurrentPosition to record timing. Timing is measured with performance.now() around the native call – start immediately before invoking Geolocation.getCurrentPosition and end inside the success/error callback.
+          No measurements yet. Tap getCurrentPosition to record timing. Timing is measured with performance.now() around the native call.
         </ThemedText>
       )}
 
       <ThemedText type="small" style={{ color: theme.textSecondary }}>
-        Android note: <ThemedText type="code">playServices</ThemedText> uses FusedLocationProviderClient (Google Play Services). Requires a development build – this module does not work in Expo Go. Run{' '}
-        <ThemedText type="code">npx expo prebuild</ThemedText> + <ThemedText type="code">npx expo run:android</ThemedText> or{' '}
-        <ThemedText type="code">eas build</ThemedText>.
+        Android uses FusedLocationProviderClient (Google Play Services). Requires a development build – this module does not work in Expo Go. Run{' '}
+        <ThemedText type="code">npx expo prebuild</ThemedText> + <ThemedText type="code">npx expo run:android</ThemedText>.
       </ThemedText>
     </ThemedView>
   );
@@ -241,32 +176,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.three,
     borderRadius: Spacing.four,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: Spacing.two,
-  },
-  providerRow: {
-    flexDirection: 'row',
-    gap: Spacing.one,
-    flexWrap: 'wrap',
-  },
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-    borderWidth: 1,
-  },
-  chipText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  chipSub: {
-    fontSize: 11,
   },
   buttonRow: {
     flexDirection: 'row',
@@ -293,6 +202,12 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '600',
     fontSize: 13,
+  },
+  clearButton: {
+    paddingVertical: 10,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   lastBox: {
     gap: 4,
