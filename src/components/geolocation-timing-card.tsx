@@ -25,6 +25,13 @@ export function GeolocationTimingCard() {
     measureGetCurrentPosition,
     clearEntries,
     lastEntry,
+    watchEntries,
+    isWatching,
+    watchError,
+    startWatchPosition,
+    stopWatchPosition,
+    clearWatchEntries,
+    lastWatchEntry,
   } = useGeolocationTiming();
 
   const [authBusy, setAuthBusy] = useState(false);
@@ -40,6 +47,16 @@ export function GeolocationTimingCard() {
 
   const onMeasure = async () => {
     await measureGetCurrentPosition();
+  };
+
+  const toggleWatch = async () => {
+    if (isWatching) {
+      stopWatchPosition();
+    } else {
+      // ensure permission before watching
+      await requestAuthorization();
+      startWatchPosition();
+    }
   };
 
   const openMaps = async (lat: number, lng: number, label?: string) => {
@@ -66,11 +83,13 @@ export function GeolocationTimingCard() {
     }
   };
 
+  const timeToFirstFixMs = watchEntries.length > 0 ? watchEntries[watchEntries.length - 1].durationSinceStartMs : null;
+
   return (
     <ThemedView type="backgroundElement" style={styles.card}>
       <ThemedText type="subtitle">Geolocation timing</ThemedText>
       <ThemedText type="small" style={{ color: theme.textSecondary }}>
-        @react-native-community/geolocation · getCurrentPosition with fused provider
+        @react-native-community/geolocation · fused provider
       </ThemedText>
 
       <ThemedView style={[styles.buttonRow, { backgroundColor: 'transparent' }]}>
@@ -93,13 +112,13 @@ export function GeolocationTimingCard() {
       </ThemedView>
 
       <Pressable onPress={clearEntries} style={[styles.clearButton, { backgroundColor: theme.background }]}>
-        <ThemedText type="small">Clear</ThemedText>
+        <ThemedText type="small">Clear getCurrentPosition</ThemedText>
       </Pressable>
 
       {lastEntry && (
         <ThemedView style={[styles.lastBox, { borderColor: theme.backgroundSelected, backgroundColor: theme.background }]}>
           <ThemedText type="small">
-            Last call: <ThemedText type="code">{lastEntry.durationMs.toFixed(1)} ms</ThemedText>
+            Last getCurrentPosition: <ThemedText type="code">{lastEntry.durationMs.toFixed(1)} ms</ThemedText>
           </ThemedText>
           {lastEntry.position ? (
             <>
@@ -131,7 +150,7 @@ export function GeolocationTimingCard() {
 
       {entries.length > 0 ? (
         <ThemedView style={{ backgroundColor: 'transparent', gap: Spacing.two }}>
-          <ThemedText type="small">History ({entries.length}) – timing includes JS → native → fused provider → callback</ThemedText>
+          <ThemedText type="small">History ({entries.length}) – JS → native → fused → callback</ThemedText>
           <ScrollView style={styles.historyScroll} nestedScrollEnabled>
             {entries.map((e) => (
               <ThemedView key={e.id} style={[styles.historyRow, { borderColor: theme.backgroundSelected, backgroundColor: theme.background }]}>
@@ -157,9 +176,101 @@ export function GeolocationTimingCard() {
         </ThemedView>
       ) : (
         <ThemedText type="small" style={{ color: theme.textSecondary }}>
-          No measurements yet. Tap getCurrentPosition to record timing. Timing is measured with performance.now() around the native call.
+          No getCurrentPosition measurements yet.
         </ThemedText>
       )}
+
+      <ThemedView style={[styles.divider, { backgroundColor: theme.backgroundSelected }]} />
+
+      <ThemedText type="subtitle">watchPosition</ThemedText>
+      <ThemedText type="small" style={{ color: theme.textSecondary }}>
+        Continuous updates via Fused Location Provider (interval 1s, distanceFilter 0, maximumAge 0)
+      </ThemedText>
+
+      <ThemedView style={[styles.buttonRow, { backgroundColor: 'transparent' }]}>
+        <Pressable
+          onPress={toggleWatch}
+          style={[
+            styles.buttonPrimary,
+            { backgroundColor: isWatching ? '#d73a49' : '#208AEF' },
+          ]}
+        >
+          {isWatching ? <ActivityIndicator size="small" color="#fff" /> : null}
+          <Text style={styles.buttonPrimaryText}>{isWatching ? 'Stop watching' : 'Start watching'}</Text>
+        </Pressable>
+        <Pressable onPress={clearWatchEntries} style={[styles.button, { backgroundColor: theme.background }]}>
+          <ThemedText type="small">Clear</ThemedText>
+        </Pressable>
+      </ThemedView>
+
+      {isWatching && (
+        <ThemedText type="small" style={{ color: theme.textSecondary }}>
+          Watching… {watchEntries.length} update{watchEntries.length === 1 ? '' : 's'}
+          {timeToFirstFixMs !== null ? ` · first fix ${timeToFirstFixMs.toFixed(1)} ms` : ''}
+        </ThemedText>
+      )}
+
+      {watchError && (
+        <ThemedText type="small" style={{ color: '#d73a49' }}>
+          Watch error {watchError.code}: {watchError.message}
+        </ThemedText>
+      )}
+
+      {lastWatchEntry?.position ? (
+        <ThemedView style={[styles.lastBox, { borderColor: theme.backgroundSelected, backgroundColor: theme.background }]}>
+          <ThemedText type="small">
+            Last watch: <ThemedText type="code">{lastWatchEntry.durationSinceStartMs.toFixed(1)} ms since start</ThemedText>
+          </ThemedText>
+          <ThemedText type="small">
+            {lastWatchEntry.position.coords.latitude.toFixed(6)}, {lastWatchEntry.position.coords.longitude.toFixed(6)} · ±{lastWatchEntry.position.coords.accuracy.toFixed(1)} m
+          </ThemedText>
+          <ThemedText type="small" style={{ color: theme.textSecondary }}>
+            {new Date(lastWatchEntry.timestamp).toLocaleTimeString()} · speed {lastWatchEntry.position.coords.speed ?? '–'} · heading {lastWatchEntry.position.coords.heading ?? '–'}
+          </ThemedText>
+          <Pressable
+            onPress={() =>
+              openMaps(lastWatchEntry.position!.coords.latitude, lastWatchEntry.position!.coords.longitude, 'Watch location')
+            }
+            style={[styles.mapsButton, { backgroundColor: theme.backgroundSelected }]}
+          >
+            <Text style={[styles.mapsButtonText, { color: theme.text }]}>
+              {Platform.OS === 'ios' ? 'Open in Apple Maps' : Platform.OS === 'android' ? 'Open in Google Maps' : 'Open in Maps'}
+            </Text>
+          </Pressable>
+        </ThemedView>
+      ) : isWatching && watchEntries.length === 0 ? (
+        <ThemedText type="small" style={{ color: theme.textSecondary }}>
+          Waiting for first fix…
+        </ThemedText>
+      ) : null}
+
+      {watchEntries.length > 0 ? (
+        <ThemedView style={{ backgroundColor: 'transparent', gap: Spacing.two }}>
+          <ThemedText type="small">Watch history ({watchEntries.length})</ThemedText>
+          <ScrollView style={styles.historyScroll} nestedScrollEnabled>
+            {watchEntries.map((e) => (
+              <ThemedView key={e.id} style={[styles.historyRow, { borderColor: theme.backgroundSelected, backgroundColor: theme.background }]}>
+                <ThemedText type="code" style={styles.mono}>
+                  +{e.durationSinceStartMs.toFixed(0).padStart(6, ' ')} ms
+                </ThemedText>
+                <ThemedText type="small" style={{ flex: 1 }}>
+                  {e.position ? `✓ ${e.position.coords.accuracy.toFixed(0)}m` : `✗ ${e.error?.code}`}
+                  {e.error ? ` · ${e.error.message.slice(0, 50)}` : ''}
+                </ThemedText>
+                {e.position && (
+                  <Pressable
+                    onPress={() => openMaps(e.position!.coords.latitude, e.position!.coords.longitude)}
+                    style={[styles.smallMapsButton, { backgroundColor: theme.backgroundSelected }]}
+                    hitSlop={8}
+                  >
+                    <Text style={[styles.smallMapsButtonText, { color: theme.text }]}>Maps</Text>
+                  </Pressable>
+                )}
+              </ThemedView>
+            ))}
+          </ScrollView>
+        </ThemedView>
+      ) : null}
 
       <ThemedText type="small" style={{ color: theme.textSecondary }}>
         Android uses FusedLocationProviderClient (Google Play Services). Requires a development build – this module does not work in Expo Go. Run{' '}
@@ -252,5 +363,10 @@ const styles = StyleSheet.create({
   smallMapsButtonText: {
     fontSize: 11,
     fontWeight: '600',
+  },
+  divider: {
+    height: 1,
+    alignSelf: 'stretch',
+    marginVertical: Spacing.one,
   },
 });
