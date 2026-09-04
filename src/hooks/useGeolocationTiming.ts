@@ -60,7 +60,8 @@ function nowMs(): number {
 
 export function useGeolocationTiming() {
   const [entries, setEntries] = useState<TimingEntry[]>([]);
-  const [isMeasuring, setIsMeasuring] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
+  const isMeasuring = pendingCount > 0;
 
   const [watchEntries, setWatchEntries] = useState<WatchEntry[]>([]);
   const [isWatching, setIsWatching] = useState(false);
@@ -111,7 +112,7 @@ export function useGeolocationTiming() {
 
   const measureGetCurrentPosition = useCallback(async (): Promise<TimingEntry> => {
     configureFusedProvider();
-    setIsMeasuring(true);
+    setPendingCount((c) => c + 1);
     const start = nowMs();
 
     const entry = await new Promise<TimingEntry>((resolve) => {
@@ -127,7 +128,7 @@ export function useGeolocationTiming() {
             error: null,
           };
           setEntries((prev) => [e, ...prev]);
-          setIsMeasuring(false);
+          setPendingCount((c) => Math.max(0, c - 1));
           resolve(e);
         },
         (error) => {
@@ -141,7 +142,7 @@ export function useGeolocationTiming() {
             error,
           };
           setEntries((prev) => [e, ...prev]);
-          setIsMeasuring(false);
+          setPendingCount((c) => Math.max(0, c - 1));
           resolve(e);
         },
         DEFAULT_OPTIONS
@@ -150,6 +151,20 @@ export function useGeolocationTiming() {
 
     return entry;
   }, []);
+
+  const measureConcurrentGetCurrentPosition = useCallback(
+    async (count: number = 5): Promise<TimingEntry[]> => {
+      // Fire `count` getCurrentPosition calls concurrently without awaiting
+      // each other – this is the reproduction for
+      // https://github.com/michalchudziak/react-native-geolocation/issues/357
+      // where PlayServicesLocationManager stored only the latest
+      // mSingleLocationCallback and the first callback nulled it before the
+      // second could call removeLocationUpdates(null).
+      const promises = Array.from({ length: count }, () => measureGetCurrentPosition());
+      return Promise.all(promises);
+    },
+    [measureGetCurrentPosition]
+  );
 
   const clearEntries = useCallback(() => setEntries([]), []);
 
@@ -207,8 +222,10 @@ export function useGeolocationTiming() {
   return {
     entries,
     isMeasuring,
+    pendingCount,
     requestAuthorization,
     measureGetCurrentPosition,
+    measureConcurrentGetCurrentPosition,
     clearEntries,
     lastEntry: entries[0] ?? null,
     watchEntries,

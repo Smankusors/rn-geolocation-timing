@@ -21,6 +21,7 @@ export function GeolocationTimingCard() {
   const {
     entries,
     isMeasuring,
+    pendingCount,
     requestAuthorization,
     measureGetCurrentPosition,
     clearEntries,
@@ -103,17 +104,25 @@ export function GeolocationTimingCard() {
 
         <Pressable
           onPress={onMeasure}
-          disabled={isMeasuring}
-          style={[styles.buttonPrimary, { opacity: isMeasuring ? 0.6 : 1 }]}
+          style={[styles.buttonPrimary, { opacity: isMeasuring ? 0.9 : 1 }]}
         >
           {isMeasuring ? <ActivityIndicator size="small" color="#fff" /> : null}
-          <Text style={styles.buttonPrimaryText}>{isMeasuring ? ' Measuring…' : 'getCurrentPosition'}</Text>
+          <Text style={styles.buttonPrimaryText}>
+            {isMeasuring ? `Measuring… (${pendingCount})` : 'getCurrentPosition'}
+          </Text>
         </Pressable>
       </ThemedView>
 
       <Pressable onPress={clearEntries} style={[styles.clearButton, { backgroundColor: theme.background }]}>
         <ThemedText type="small">Clear getCurrentPosition</ThemedText>
       </Pressable>
+
+      {isMeasuring && pendingCount > 1 && (
+        <ThemedText type="small" style={{ color: theme.textSecondary }}>
+          {pendingCount} concurrent getCurrentPosition requests in flight – reproduces
+          <ThemedText type="code"> issue #357</ThemedText> (NullPointerException Listener must not be null)
+        </ThemedText>
+      )}
 
       {lastEntry && (
         <ThemedView style={[styles.lastBox, { borderColor: theme.backgroundSelected, backgroundColor: theme.background }]}>
