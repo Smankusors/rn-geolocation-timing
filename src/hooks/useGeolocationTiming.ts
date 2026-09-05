@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { PermissionsAndroid, Platform } from 'react-native';
+import { Platform } from 'react-native';
 import Geolocation, {
   GeolocationError,
   GeolocationResponse,
@@ -78,37 +78,6 @@ export function useGeolocationTiming() {
     };
   }, []);
 
-  const requestAuthorization = useCallback(async (): Promise<boolean> => {
-    if (Platform.OS === 'android') {
-      try {
-        const fine = await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION);
-        const coarse = await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION);
-        if (fine || coarse) return true;
-        const result = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION, {
-          title: 'Location Permission',
-          message: 'This app needs access to your location to measure getCurrentPosition timing with the fused provider.',
-          buttonPositive: 'OK',
-          buttonNegative: 'Cancel',
-          buttonNeutral: 'Ask Me Later',
-        });
-        return result === PermissionsAndroid.RESULTS.GRANTED;
-      } catch {
-        return false;
-      }
-    }
-
-    if (Platform.OS === 'ios') {
-      return new Promise((resolve) => {
-        Geolocation.requestAuthorization(
-          () => resolve(true),
-          () => resolve(false)
-        );
-      });
-    }
-
-    return true;
-  }, []);
-
   const measureGetCurrentPosition = useCallback(async (): Promise<TimingEntry> => {
     configureFusedProvider();
     setPendingCount((c) => c + 1);
@@ -153,12 +122,6 @@ export function useGeolocationTiming() {
 
   const measureConcurrentGetCurrentPosition = useCallback(
     async (count: number = 5): Promise<TimingEntry[]> => {
-      // Fire `count` getCurrentPosition calls concurrently without awaiting
-      // each other – this is the reproduction for
-      // https://github.com/michalchudziak/react-native-geolocation/issues/357
-      // where PlayServicesLocationManager stored only the latest
-      // mSingleLocationCallback and the first callback nulled it before the
-      // second could call removeLocationUpdates(null).
       const promises = Array.from({ length: count }, () => measureGetCurrentPosition());
       return Promise.all(promises);
     },
@@ -221,7 +184,6 @@ export function useGeolocationTiming() {
     entries,
     isMeasuring,
     pendingCount,
-    requestAuthorization,
     measureGetCurrentPosition,
     measureConcurrentGetCurrentPosition,
     clearEntries,

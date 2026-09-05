@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -22,7 +21,6 @@ export function GeolocationTimingCard() {
     entries,
     isMeasuring,
     pendingCount,
-    requestAuthorization,
     measureGetCurrentPosition,
     clearEntries,
     lastEntry,
@@ -35,27 +33,14 @@ export function GeolocationTimingCard() {
     lastWatchEntry,
   } = useGeolocationTiming();
 
-  const [authBusy, setAuthBusy] = useState(false);
-
-  const onRequestPermission = async () => {
-    setAuthBusy(true);
-    try {
-      await requestAuthorization();
-    } finally {
-      setAuthBusy(false);
-    }
-  };
-
   const onMeasure = async () => {
     await measureGetCurrentPosition();
   };
 
-  const toggleWatch = async () => {
+  const toggleWatch = () => {
     if (isWatching) {
       stopWatchPosition();
     } else {
-      // ensure permission before watching
-      await requestAuthorization();
       startWatchPosition();
     }
   };
@@ -93,25 +78,15 @@ export function GeolocationTimingCard() {
         @react-native-community/geolocation · fused provider
       </ThemedText>
 
-      <ThemedView style={[styles.buttonRow, { backgroundColor: 'transparent' }]}>
-        <Pressable
-          onPress={onRequestPermission}
-          disabled={authBusy}
-          style={[styles.button, { backgroundColor: theme.backgroundSelected, opacity: authBusy ? 0.6 : 1 }]}
-        >
-          <ThemedText type="small">{authBusy ? 'Requesting…' : 'Request permission'}</ThemedText>
-        </Pressable>
-
-        <Pressable
-          onPress={onMeasure}
-          style={[styles.buttonPrimary, { opacity: isMeasuring ? 0.9 : 1 }]}
-        >
-          {isMeasuring ? <ActivityIndicator size="small" color="#fff" /> : null}
-          <Text style={styles.buttonPrimaryText}>
-            {isMeasuring ? `Measuring… (${pendingCount})` : 'getCurrentPosition'}
-          </Text>
-        </Pressable>
-      </ThemedView>
+      <Pressable
+        onPress={onMeasure}
+        style={[styles.buttonPrimary, { opacity: isMeasuring ? 0.9 : 1 }]}
+      >
+        {isMeasuring ? <ActivityIndicator size="small" color="#fff" /> : null}
+        <Text style={styles.buttonPrimaryText}>
+          {isMeasuring ? `Measuring… (${pendingCount})` : 'getCurrentPosition'}
+        </Text>
+      </Pressable>
 
       <Pressable onPress={clearEntries} style={[styles.clearButton, { backgroundColor: theme.background }]}>
         <ThemedText type="small">Clear getCurrentPosition</ThemedText>
