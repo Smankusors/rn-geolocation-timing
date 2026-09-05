@@ -17,6 +17,16 @@ This repro is Android only. It requires a development build (Fused Location Prov
 - Android permissions are declared in `app.json`: `ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION`, `FOREGROUND_SERVICE`.
 - Location provider is set to `playServices` in `src/hooks/useGeolocationTiming.ts`.
 
+## Prebuilt APK
+
+A ready-to-install Release APK (signed with the debug keystore, `arm64-v8a` only) is built by GitHub Actions.
+
+1. Open **Actions → Android APK →** latest successful run.
+2. Download the artifact **rn-geolocation-timing-arm64-v8a-release** (under *Artifacts*).
+3. Install on a device/emulator with Play Services: `adb install app-release.apk`.
+
+> GitHub artifacts expire after 90 days. If no artifact is listed (expired or no run yet), trigger a new build via **Actions → Android APK → Run workflow** or build locally (see Getting started).
+
 ## Project structure
 
 - `src/app/index.tsx` - single screen with `GeolocationTimingCard`
