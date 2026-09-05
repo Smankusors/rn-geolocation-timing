@@ -1,46 +1,68 @@
-# Welcome to your Expo app 👋
+# rn-geolocation-timing
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Minimal Expo app to reproduce two Android issues with `@react-native-community/geolocation` using the Fused Location Provider.
 
-## Get started
+## What this reproduces
 
-1. Install dependencies
+**1. Crash on concurrent `getCurrentPosition`** - calling `Geolocation.getCurrentPosition` concurrently crashes the app with `NullPointerException: Listener must not be null`. The library keeps only the latest `LocationCallback` in an instance variable (`mSingleLocationCallback` in `PlayServicesLocationManager`), so the second call overwrites the first. Whichever finishes first clears the variable to `null`, and the other then calls `removeLocationUpdates(null)` and crashes.
 
-   ```bash
-   npm install
-   ```
+Original issue: https://github.com/michalchudziak/react-native-geolocation/issues/357
 
-2. Start the app
+**2. Slow `getCurrentPosition`** - a single `getCurrentPosition` with `enableHighAccuracy: true` resolves in ~10 seconds on the Fused provider, compared to ~5 seconds for the same request in the browser Geolocation API on the same device.
 
-   ```bash
-   npx expo start
-   ```
+## Android only
 
-In the output, you'll find options to open the app in a
+This repro is Android only. It requires a development build (Fused Location Provider via Google Play Services) and does not work in Expo Go.
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+- Android permissions are declared in `app.json`: `ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION`, `FOREGROUND_SERVICE`.
+- Location provider is set to `playServices` in `src/hooks/useGeolocationTiming.ts`.
 
-You can start developing by editing the files inside the **src/app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+## Project structure
 
-### Other setup steps
+- `src/app/index.tsx` - single screen with `GeolocationTimingCard`
+- `src/hooks/useGeolocationTiming.ts` - `getCurrentPosition` / `watchPosition` harness with concurrency support
+- `src/components/geolocation-timing-card.tsx` - UI for triggering measurements and viewing history
+- `patches/@react-native-community+geolocation+3.4.0.patch` - local patch (see below)
+- `app.json` - Expo config, Android package `com.rngeolocationtiming.app`
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+## Getting started
 
-## Learn more
+```bash
+npm install
+npx expo prebuild
+npx expo run:android
+```
 
-To learn more about developing your project with Expo, look at the following resources:
+Requires an Android emulator or device with Google Play Services, location enabled, and location permission granted at runtime. `npm install` applies the patch via `patch-package`.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+## How to reproduce
 
-## Join the community
+### Crash (concurrent requests)
 
-Join our community of developers creating universal apps.
+1. Build and launch on Android.
+2. Tap **getCurrentPosition** rapidly so 2+ requests are in flight at once (the card shows the in-flight count).
+3. On the unpatched library, the app crashes. Check logcat for:
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+```
+java.lang.NullPointerException: Listener must not be null
+  at FusedLocationProviderClient.removeLocationUpdates
+  at com.reactnativecommunity.geolocation.PlayServicesLocationManager
+```
+
+### Slowness
+
+1. Tap **getCurrentPosition** once.
+2. Observe the reported duration - typically ~10s on this app vs ~5s in Chrome on the same device with the same high-accuracy request.
+
+## Patch in this repo
+
+`patches/@react-native-community+geolocation+3.4.0.patch` is unrelated to the crash or the slowness above. It suppresses spurious `POSITION_UNAVAILABLE` errors when `FusedLocationProvider` returns a null `lastLocation` or transient unavailability before the first fix. It is currently needed to get `getCurrentPosition` to actually resolve instead of erroring immediately on some devices/emulators. Remove it to reproduce the upstream behavior without the workaround.
+
+## Scripts
+
+```bash
+npm start        # expo start
+npm run android  # expo run:android
+npm run ios      # expo run:ios (not the focus of this repro)
+npm run lint     # expo lint
+```
