@@ -74,7 +74,6 @@ export function useGeolocationTiming() {
     return () => {
       if (watchIdRef.current !== null) {
         Geolocation.clearWatch(watchIdRef.current);
-        Geolocation.stopObserving();
       }
     };
   }, []);
@@ -211,7 +210,6 @@ export function useGeolocationTiming() {
   const stopWatchPosition = useCallback(() => {
     if (watchIdRef.current !== null) {
       Geolocation.clearWatch(watchIdRef.current);
-      Geolocation.stopObserving();
       watchIdRef.current = null;
     }
     setIsWatching(false);
