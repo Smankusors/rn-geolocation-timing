@@ -22,10 +22,25 @@
       ],
       "package": "com.rngeolocationtiming.app"
     },
-    "plugins": ["expo-router"],
+    "plugins": [
+      "expo-router",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableMinifyInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true,
+            "extraProguardRules": "-keep class com.reactnativecommunity.geolocation.** { *; }\n-keep class com.google.android.gms.location.** { *; }"
+          }
+        }
+      ]
+    ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "ios": {
+      "bundleIdentifier": "com.rngeolocationtiming.app"
     }
   }
 }
