@@ -5,7 +5,7 @@ import Geolocation, {
   GeolocationResponse,
 } from '@react-native-community/geolocation';
 
-export type TimingEntry = {
+type TimingEntry = {
   id: string;
   startTime: number;
   endTime: number;
@@ -14,7 +14,7 @@ export type TimingEntry = {
   error: GeolocationError | null;
 };
 
-export type WatchEntry = {
+type WatchEntry = {
   id: string;
   timestamp: number;
   durationSinceStartMs: number;
@@ -120,14 +120,6 @@ export function useGeolocationTiming() {
     return entry;
   }, []);
 
-  const measureConcurrentGetCurrentPosition = useCallback(
-    async (count: number = 5): Promise<TimingEntry[]> => {
-      const promises = Array.from({ length: count }, () => measureGetCurrentPosition());
-      return Promise.all(promises);
-    },
-    [measureGetCurrentPosition]
-  );
-
   const clearEntries = useCallback(() => setEntries([]), []);
 
   const startWatchPosition = useCallback(() => {
@@ -185,7 +177,6 @@ export function useGeolocationTiming() {
     isMeasuring,
     pendingCount,
     measureGetCurrentPosition,
-    measureConcurrentGetCurrentPosition,
     clearEntries,
     lastEntry: entries[0] ?? null,
     watchEntries,
