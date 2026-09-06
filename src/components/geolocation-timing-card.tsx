@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -7,6 +8,8 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
+  View,
 } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
@@ -14,6 +17,20 @@ import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useGeolocationTiming } from '@/hooks/useGeolocationTiming';
+
+const TIMEOUT_PRESETS_MS = [5_000, 10_000, 15_000, 30_000, 60_000] as const;
+const MAXIMUM_AGE_PRESETS_MS = [0, 1_000, 5_000, 10_000, 30_000, 60_000] as const;
+
+function formatTimeout(ms: number): string {
+  if (ms % 1000 === 0) return `${ms / 1000}s`;
+  return `${ms}ms`;
+}
+
+function formatMaximumAge(ms: number): string {
+  if (ms === 0) return 'no cache';
+  if (ms % 1000 === 0) return `${ms / 1000}s`;
+  return `${ms}ms`;
+}
 
 export function GeolocationTimingCard() {
   const theme = useTheme();
@@ -31,7 +48,46 @@ export function GeolocationTimingCard() {
     stopWatchPosition,
     clearWatchEntries,
     lastWatchEntry,
+    timeoutMs,
+    setTimeoutMs,
+    maximumAgeMs,
+    setMaximumAgeMs,
   } = useGeolocationTiming();
+
+  const [timeoutInput, setTimeoutInput] = useState(String(timeoutMs));
+  const [maximumAgeInput, setMaximumAgeInput] = useState(String(maximumAgeMs));
+
+  const handleTimeoutChange = (text: string) => {
+    setTimeoutInput(text);
+    const digits = text.replace(/[^0-9]/g, '');
+    if (digits === '') return;
+    const parsed = Number(digits);
+    if (Number.isFinite(parsed)) setTimeoutMs(parsed);
+  };
+
+  const handleMaximumAgeChange = (text: string) => {
+    setMaximumAgeInput(text);
+    const digits = text.replace(/[^0-9]/g, '');
+    if (digits === '') return;
+    const parsed = Number(digits);
+    if (Number.isFinite(parsed)) setMaximumAgeMs(parsed);
+  };
+
+  const commitTimeoutInput = (raw: string, committed: number, setter: (n: number) => void, setInput: (s: string) => void) => {
+    const digits = raw.replace(/[^0-9]/g, '');
+    if (digits === '') {
+      setInput(String(committed));
+      return;
+    }
+    const parsed = Number(digits);
+    if (!Number.isFinite(parsed)) {
+      setInput(String(committed));
+      return;
+    }
+    setter(parsed);
+    // setter clamps internally; reflect clamped value if hook state diverged, keep typed value otherwise
+    // normalized on next render via committed value; keep digits as-is for now
+  };
 
   const onMeasure = async () => {
     await measureGetCurrentPosition();
@@ -77,6 +133,108 @@ export function GeolocationTimingCard() {
       <ThemedText type="small" style={{ color: theme.textSecondary }}>
         @react-native-community/geolocation · fused provider
       </ThemedText>
+
+      <ThemedView style={[styles.timeoutBox, { borderColor: theme.backgroundSelected, backgroundColor: theme.background }]}>
+        <ThemedText type="small" style={{ fontWeight: '600' }}>
+          getCurrentPosition options
+        </ThemedText>
+
+        <ThemedText type="small" style={{ color: theme.textSecondary, marginBottom: -4 }}>
+          timeout
+        </ThemedText>
+        <View style={styles.timeoutRow}>
+          <TextInput
+            value={timeoutInput}
+            onChangeText={handleTimeoutChange}
+            onBlur={() => commitTimeoutInput(timeoutInput, timeoutMs, setTimeoutMs, setTimeoutInput)}
+            onSubmitEditing={() => commitTimeoutInput(timeoutInput, timeoutMs, setTimeoutMs, setTimeoutInput)}
+            keyboardType="number-pad"
+            returnKeyType="done"
+            selectTextOnFocus
+            style={[
+              styles.timeoutInput,
+              { color: theme.text, borderColor: theme.backgroundSelected, backgroundColor: theme.backgroundElement },
+            ]}
+            placeholder="15000"
+            placeholderTextColor={theme.textSecondary}
+          />
+          <ThemedText type="small" style={{ color: theme.textSecondary }}>
+            ms ({formatTimeout(timeoutMs)})
+          </ThemedText>
+        </View>
+        <View style={styles.presetRow}>
+          {TIMEOUT_PRESETS_MS.map((preset) => {
+            const active = timeoutMs === preset;
+            return (
+              <Pressable
+                key={preset}
+                onPress={() => {
+                  setTimeoutMs(preset);
+                  setTimeoutInput(String(preset));
+                }}
+                style={[
+                  styles.presetChip,
+                  {
+                    backgroundColor: active ? '#208AEF' : theme.backgroundSelected,
+                    borderColor: active ? '#208AEF' : 'transparent',
+                  },
+                ]}
+              >
+                <Text style={[styles.presetChipText, { color: active ? '#fff' : theme.text }]}>{formatTimeout(preset)}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <ThemedText type="small" style={{ color: theme.textSecondary, marginBottom: -4, marginTop: Spacing.one }}>
+          maximumAge
+        </ThemedText>
+        <View style={styles.timeoutRow}>
+          <TextInput
+            value={maximumAgeInput}
+            onChangeText={handleMaximumAgeChange}
+            onBlur={() => commitTimeoutInput(maximumAgeInput, maximumAgeMs, setMaximumAgeMs, setMaximumAgeInput)}
+            onSubmitEditing={() => commitTimeoutInput(maximumAgeInput, maximumAgeMs, setMaximumAgeMs, setMaximumAgeInput)}
+            keyboardType="number-pad"
+            returnKeyType="done"
+            selectTextOnFocus
+            style={[
+              styles.timeoutInput,
+              { color: theme.text, borderColor: theme.backgroundSelected, backgroundColor: theme.backgroundElement },
+            ]}
+            placeholder="0"
+            placeholderTextColor={theme.textSecondary}
+          />
+          <ThemedText type="small" style={{ color: theme.textSecondary }}>
+            ms ({formatMaximumAge(maximumAgeMs)})
+          </ThemedText>
+        </View>
+        <View style={styles.presetRow}>
+          {MAXIMUM_AGE_PRESETS_MS.map((preset) => {
+            const active = maximumAgeMs === preset;
+            return (
+              <Pressable
+                key={preset}
+                onPress={() => {
+                  setMaximumAgeMs(preset);
+                  setMaximumAgeInput(String(preset));
+                }}
+                style={[
+                  styles.presetChip,
+                  {
+                    backgroundColor: active ? '#208AEF' : theme.backgroundSelected,
+                    borderColor: active ? '#208AEF' : 'transparent',
+                  },
+                ]}
+              >
+                <Text style={[styles.presetChipText, { color: active ? '#fff' : theme.text }]}>
+                  {formatMaximumAge(preset)}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </ThemedView>
 
       <Pressable
         onPress={onMeasure}
@@ -168,7 +326,7 @@ export function GeolocationTimingCard() {
 
       <ThemedText type="subtitle">watchPosition</ThemedText>
       <ThemedText type="small" style={{ color: theme.textSecondary }}>
-        Continuous updates via Fused Location Provider (interval 1s, distanceFilter 0, maximumAge 0)
+        Continuous updates via Fused Location Provider (interval 1s, distanceFilter 0)
       </ThemedText>
 
       <ThemedView style={[styles.buttonRow, { backgroundColor: 'transparent' }]}>
@@ -352,5 +510,43 @@ const styles = StyleSheet.create({
     height: 1,
     alignSelf: 'stretch',
     marginVertical: Spacing.one,
+  },
+  timeoutBox: {
+    alignSelf: 'stretch',
+    gap: Spacing.two,
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  timeoutRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+  },
+  timeoutInput: {
+    flex: 1,
+    minWidth: 80,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    fontSize: 13,
+    fontWeight: '500',
+    textAlign: 'right',
+  },
+  presetRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  presetChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  presetChipText: {
+    fontSize: 11,
+    fontWeight: '600',
   },
 });

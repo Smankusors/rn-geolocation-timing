@@ -22,20 +22,29 @@ type WatchEntry = {
   error: GeolocationError | null;
 };
 
-const DEFAULT_OPTIONS = {
+export const DEFAULT_TIMEOUT_MS = 15000;
+export const DEFAULT_MAXIMUM_AGE_MS = 0;
+
+const BASE_GET_CURRENT_OPTIONS = {
   enableHighAccuracy: true,
-  timeout: 15000,
-  maximumAge: 0,
 } as const;
 
-const WATCH_OPTIONS = {
+const BASE_WATCH_OPTIONS = {
   enableHighAccuracy: true,
   distanceFilter: 0,
   interval: 1000,
   fastestInterval: 1000,
-  timeout: 15000,
-  maximumAge: 0,
 } as const;
+
+export function clampTimeout(value: number): number {
+  if (!Number.isFinite(value)) return DEFAULT_TIMEOUT_MS;
+  return Math.max(0, Math.min(600_000, Math.round(value)));
+}
+
+export function clampMaximumAge(value: number): number {
+  if (!Number.isFinite(value)) return DEFAULT_MAXIMUM_AGE_MS;
+  return Math.max(0, Math.min(86_400_000, Math.round(value)));
+}
 
 function configureFusedProvider() {
   if (Platform.OS === 'android') {
@@ -58,7 +67,19 @@ function nowMs(): number {
   return Date.now();
 }
 
-export function useGeolocationTiming() {
+export type UseGeolocationTimingOptions = {
+  defaultTimeoutMs?: number;
+  defaultMaximumAgeMs?: number;
+};
+
+export function useGeolocationTiming(options?: UseGeolocationTimingOptions) {
+  const [timeoutMs, setTimeoutMs] = useState(() =>
+    clampTimeout(options?.defaultTimeoutMs ?? DEFAULT_TIMEOUT_MS)
+  );
+  const [maximumAgeMs, setMaximumAgeMs] = useState(() =>
+    clampMaximumAge(options?.defaultMaximumAgeMs ?? DEFAULT_MAXIMUM_AGE_MS)
+  );
+
   const [entries, setEntries] = useState<TimingEntry[]>([]);
   const [pendingCount, setPendingCount] = useState(0);
   const isMeasuring = pendingCount > 0;
@@ -78,47 +99,52 @@ export function useGeolocationTiming() {
     };
   }, []);
 
-  const measureGetCurrentPosition = useCallback(async (): Promise<TimingEntry> => {
-    configureFusedProvider();
-    setPendingCount((c) => c + 1);
-    const start = nowMs();
+  const measureGetCurrentPosition = useCallback(
+    async (override?: { timeoutMs?: number; maximumAgeMs?: number }): Promise<TimingEntry> => {
+      configureFusedProvider();
+      setPendingCount((c) => c + 1);
+      const start = nowMs();
+      const timeout = clampTimeout(override?.timeoutMs ?? timeoutMs);
+      const maximumAge = clampMaximumAge(override?.maximumAgeMs ?? maximumAgeMs);
 
-    const entry = await new Promise<TimingEntry>((resolve) => {
-      Geolocation.getCurrentPosition(
-        (position) => {
-          const end = nowMs();
-          const e: TimingEntry = {
-            id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-            startTime: start,
-            endTime: end,
-            durationMs: end - start,
-            position,
-            error: null,
-          };
-          setEntries((prev) => [e, ...prev]);
-          setPendingCount((c) => Math.max(0, c - 1));
-          resolve(e);
-        },
-        (error) => {
-          const end = nowMs();
-          const e: TimingEntry = {
-            id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-            startTime: start,
-            endTime: end,
-            durationMs: end - start,
-            position: null,
-            error,
-          };
-          setEntries((prev) => [e, ...prev]);
-          setPendingCount((c) => Math.max(0, c - 1));
-          resolve(e);
-        },
-        DEFAULT_OPTIONS
-      );
-    });
+      const entry = await new Promise<TimingEntry>((resolve) => {
+        Geolocation.getCurrentPosition(
+          (position) => {
+            const end = nowMs();
+            const e: TimingEntry = {
+              id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+              startTime: start,
+              endTime: end,
+              durationMs: end - start,
+              position,
+              error: null,
+            };
+            setEntries((prev) => [e, ...prev]);
+            setPendingCount((c) => Math.max(0, c - 1));
+            resolve(e);
+          },
+          (error) => {
+            const end = nowMs();
+            const e: TimingEntry = {
+              id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+              startTime: start,
+              endTime: end,
+              durationMs: end - start,
+              position: null,
+              error,
+            };
+            setEntries((prev) => [e, ...prev]);
+            setPendingCount((c) => Math.max(0, c - 1));
+            resolve(e);
+          },
+          { ...BASE_GET_CURRENT_OPTIONS, timeout, maximumAge }
+        );
+      });
 
-    return entry;
-  }, []);
+      return entry;
+    },
+    [timeoutMs, maximumAgeMs]
+  );
 
   const clearEntries = useCallback(() => setEntries([]), []);
 
@@ -157,7 +183,7 @@ export function useGeolocationTiming() {
         setWatchEntries((prev) => [e, ...prev]);
         setWatchError(error);
       },
-      WATCH_OPTIONS
+      { ...BASE_WATCH_OPTIONS, timeout: DEFAULT_TIMEOUT_MS, maximumAge: DEFAULT_MAXIMUM_AGE_MS }
     );
     watchIdRef.current = watchId;
   }, []);
@@ -171,6 +197,14 @@ export function useGeolocationTiming() {
   }, []);
 
   const clearWatchEntries = useCallback(() => setWatchEntries([]), []);
+
+  const setTimeoutMsClamped = useCallback((value: number) => {
+    setTimeoutMs(clampTimeout(value));
+  }, []);
+
+  const setMaximumAgeMsClamped = useCallback((value: number) => {
+    setMaximumAgeMs(clampMaximumAge(value));
+  }, []);
 
   return {
     entries,
@@ -186,5 +220,9 @@ export function useGeolocationTiming() {
     stopWatchPosition,
     clearWatchEntries,
     lastWatchEntry: watchEntries[0] ?? null,
+    timeoutMs,
+    setTimeoutMs: setTimeoutMsClamped,
+    maximumAgeMs,
+    setMaximumAgeMs: setMaximumAgeMsClamped,
   };
 }
