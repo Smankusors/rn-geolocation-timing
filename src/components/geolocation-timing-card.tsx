@@ -131,7 +131,7 @@ export function GeolocationTimingCard() {
     <ThemedView type="backgroundElement" style={styles.card}>
       <ThemedText type="subtitle">Geolocation timing</ThemedText>
       <ThemedText type="small" style={{ color: theme.textSecondary }}>
-        @react-native-community/geolocation · fused provider
+        @react-native-community/geolocation
       </ThemedText>
 
       <ThemedView style={[styles.timeoutBox, { borderColor: theme.backgroundSelected, backgroundColor: theme.background }]}>
@@ -326,7 +326,7 @@ export function GeolocationTimingCard() {
 
       <ThemedText type="subtitle">watchPosition</ThemedText>
       <ThemedText type="small" style={{ color: theme.textSecondary }}>
-        Continuous updates via Fused Location Provider (interval 1s, distanceFilter 0)
+        Continuous updates (interval 1s, distanceFilter 0)
       </ThemedText>
 
       <ThemedView style={[styles.buttonRow, { backgroundColor: 'transparent' }]}>
@@ -415,7 +415,7 @@ export function GeolocationTimingCard() {
       ) : null}
 
       <ThemedText type="small" style={{ color: theme.textSecondary }}>
-        Android uses FusedLocationProviderClient (Google Play Services). Requires a development build – this module does not work in Expo Go. Run{' '}
+        Requires a development build – this module does not work in Expo Go. Run{' '}
         <ThemedText type="code">npx expo prebuild</ThemedText> + <ThemedText type="code">npx expo run:android</ThemedText>.
       </ThemedText>
     </ThemedView>
