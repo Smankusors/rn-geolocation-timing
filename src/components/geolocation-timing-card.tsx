@@ -129,9 +129,9 @@ export function GeolocationTimingCard() {
 
   return (
     <ThemedView type="backgroundElement" style={styles.card}>
-      <ThemedText type="subtitle">Geolocation timing</ThemedText>
+      <ThemedText type="subtitle">getCurrentPosition</ThemedText>
       <ThemedText type="small" style={{ color: theme.textSecondary }}>
-        @react-native-community/geolocation
+        One-shot request
       </ThemedText>
 
       <ThemedView style={[styles.timeoutBox, { borderColor: theme.backgroundSelected, backgroundColor: theme.background }]}>
@@ -236,19 +236,20 @@ export function GeolocationTimingCard() {
         </View>
       </ThemedView>
 
-      <Pressable
-        onPress={onMeasure}
-        style={[styles.buttonPrimary, { opacity: isMeasuring ? 0.9 : 1 }]}
-      >
-        {isMeasuring ? <ActivityIndicator size="small" color="#fff" /> : null}
-        <Text style={styles.buttonPrimaryText}>
-          {isMeasuring ? `Measuring… (${pendingCount})` : 'getCurrentPosition'}
-        </Text>
-      </Pressable>
-
-      <Pressable onPress={clearEntries} style={[styles.clearButton, { backgroundColor: theme.background }]}>
-        <ThemedText type="small">Clear getCurrentPosition</ThemedText>
-      </Pressable>
+      <ThemedView style={[styles.buttonRow, { backgroundColor: 'transparent' }]}>
+        <Pressable
+          onPress={onMeasure}
+          style={[styles.buttonPrimary, { opacity: isMeasuring ? 0.9 : 1 }]}
+        >
+          {isMeasuring ? <ActivityIndicator size="small" color="#fff" /> : null}
+          <Text style={styles.buttonPrimaryText}>
+            {isMeasuring ? `Measuring… (${pendingCount})` : 'getCurrentPosition'}
+          </Text>
+        </Pressable>
+        <Pressable onPress={clearEntries} style={[styles.button, { backgroundColor: theme.background }]}>
+          <ThemedText type="small">Clear</ThemedText>
+        </Pressable>
+      </ThemedView>
 
       {isMeasuring && pendingCount > 1 && (
         <ThemedText type="small" style={{ color: theme.textSecondary }}>
