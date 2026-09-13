@@ -24,6 +24,7 @@ type WatchEntry = {
 
 export const DEFAULT_TIMEOUT_MS = 15000;
 export const DEFAULT_MAXIMUM_AGE_MS = 0;
+export const DEFAULT_SKIP_PERMISSION_REQUESTS = false;
 
 const BASE_GET_CURRENT_OPTIONS = {
   enableHighAccuracy: true,
@@ -46,16 +47,11 @@ export function clampMaximumAge(value: number): number {
   return Math.max(0, Math.min(86_400_000, Math.round(value)));
 }
 
-function configureFusedProvider() {
+function configureFusedProvider(skipPermissionRequests: boolean) {
   if (Platform.OS === 'android') {
     Geolocation.setRNConfiguration({
-      skipPermissionRequests: false,
+      skipPermissionRequests,
       locationProvider: 'playServices',
-    });
-  } else if (Platform.OS === 'ios') {
-    Geolocation.setRNConfiguration({
-      skipPermissionRequests: false,
-      authorizationLevel: 'whenInUse',
     });
   }
 }
@@ -70,6 +66,7 @@ function nowMs(): number {
 export type UseGeolocationTimingOptions = {
   defaultTimeoutMs?: number;
   defaultMaximumAgeMs?: number;
+  defaultSkipPermissionRequests?: boolean;
 };
 
 export function useGeolocationTiming(options?: UseGeolocationTimingOptions) {
@@ -78,6 +75,9 @@ export function useGeolocationTiming(options?: UseGeolocationTimingOptions) {
   );
   const [maximumAgeMs, setMaximumAgeMs] = useState(() =>
     clampMaximumAge(options?.defaultMaximumAgeMs ?? DEFAULT_MAXIMUM_AGE_MS)
+  );
+  const [skipPermissionRequests, setSkipPermissionRequests] = useState(
+    options?.defaultSkipPermissionRequests ?? DEFAULT_SKIP_PERMISSION_REQUESTS
   );
 
   const [entries, setEntries] = useState<TimingEntry[]>([]);
@@ -91,17 +91,17 @@ export function useGeolocationTiming(options?: UseGeolocationTimingOptions) {
   const watchStartMsRef = useRef<number | null>(null);
 
   useEffect(() => {
-    configureFusedProvider();
+    configureFusedProvider(skipPermissionRequests);
     return () => {
       if (watchIdRef.current !== null) {
         Geolocation.clearWatch(watchIdRef.current);
       }
     };
-  }, []);
+  }, [skipPermissionRequests]);
 
   const measureGetCurrentPosition = useCallback(
     async (override?: { timeoutMs?: number; maximumAgeMs?: number }): Promise<TimingEntry> => {
-      configureFusedProvider();
+      configureFusedProvider(skipPermissionRequests);
       setPendingCount((c) => c + 1);
       const start = nowMs();
       const timeout = clampTimeout(override?.timeoutMs ?? timeoutMs);
@@ -143,14 +143,14 @@ export function useGeolocationTiming(options?: UseGeolocationTimingOptions) {
 
       return entry;
     },
-    [timeoutMs, maximumAgeMs]
+    [timeoutMs, maximumAgeMs, skipPermissionRequests]
   );
 
   const clearEntries = useCallback(() => setEntries([]), []);
 
   const startWatchPosition = useCallback(() => {
     if (watchIdRef.current !== null) return;
-    configureFusedProvider();
+    configureFusedProvider(skipPermissionRequests);
     setWatchError(null);
     const startMs = nowMs();
     watchStartMsRef.current = startMs;
@@ -186,7 +186,7 @@ export function useGeolocationTiming(options?: UseGeolocationTimingOptions) {
       { ...BASE_WATCH_OPTIONS, timeout: DEFAULT_TIMEOUT_MS, maximumAge: DEFAULT_MAXIMUM_AGE_MS }
     );
     watchIdRef.current = watchId;
-  }, []);
+  }, [skipPermissionRequests]);
 
   const stopWatchPosition = useCallback(() => {
     if (watchIdRef.current !== null) {
@@ -224,5 +224,7 @@ export function useGeolocationTiming(options?: UseGeolocationTimingOptions) {
     setTimeoutMs: setTimeoutMsClamped,
     maximumAgeMs,
     setMaximumAgeMs: setMaximumAgeMsClamped,
+    skipPermissionRequests,
+    setSkipPermissionRequests,
   };
 }

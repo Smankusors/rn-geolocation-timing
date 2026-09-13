@@ -7,6 +7,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   View,
@@ -52,6 +53,8 @@ export function GeolocationTimingCard() {
     setTimeoutMs,
     maximumAgeMs,
     setMaximumAgeMs,
+    skipPermissionRequests,
+    setSkipPermissionRequests,
   } = useGeolocationTiming();
 
   const [timeoutInput, setTimeoutInput] = useState(String(timeoutMs));
@@ -129,6 +132,29 @@ export function GeolocationTimingCard() {
 
   return (
     <ThemedView type="backgroundElement" style={styles.card}>
+      <ThemedView style={[styles.timeoutBox, { borderColor: theme.backgroundSelected, backgroundColor: theme.background }]}>
+        <ThemedText type="small" style={{ fontWeight: '600' }}>
+          Location configuration
+        </ThemedText>
+        <View style={styles.switchRow}>
+          <View style={styles.switchLabel}>
+            <ThemedText type="small" style={{ fontWeight: '600' }}>
+              skipPermissionRequests
+            </ThemedText>
+            <ThemedText type="small" style={{ color: theme.textSecondary }}>
+              {skipPermissionRequests
+                ? 'On – library skips permission prompts'
+                : 'Off – library requests permission'}
+            </ThemedText>
+          </View>
+          <Switch
+            value={skipPermissionRequests}
+            onValueChange={setSkipPermissionRequests}
+            trackColor={{ false: theme.backgroundSelected, true: '#208AEF' }}
+          />
+        </View>
+      </ThemedView>
+
       <ThemedText type="subtitle">getCurrentPosition</ThemedText>
       <ThemedText type="small" style={{ color: theme.textSecondary }}>
         One-shot request
@@ -549,5 +575,15 @@ const styles = StyleSheet.create({
   presetChipText: {
     fontSize: 11,
     fontWeight: '600',
+  },
+  switchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.two,
+  },
+  switchLabel: {
+    flex: 1,
+    gap: 2,
   },
 });
