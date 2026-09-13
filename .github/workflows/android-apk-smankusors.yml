@@ -1,0 +1,57 @@
+name: Android APK (Smankusors fork)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22.13.0
+          cache: npm
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      - name: Install Smankusors geolocation fork (track master)
+        run: |
+          rm -rf patches
+          npm pkg delete scripts.postinstall
+          npm install "github:Smankusors/react-native-geolocation#master" --no-audit --no-fund
+          npm ls @react-native-community/geolocation
+
+      - name: Override app identity for side-by-side install
+        run: |
+          jq '.expo.name = "rn-geolocation-timing-smankusors"
+            | .expo.slug = "rn-geolocation-timing-smankusors"
+            | .expo.scheme = "rngeolocationtiming-smankusors"
+            | .expo.android.package = "com.rngeolocationtiming.smankusors"
+            | .expo.ios.bundleIdentifier = "com.rngeolocationtiming.smankusors"' \
+            app.json > app.json.tmp && mv app.json.tmp app.json
+          cat app.json
+
+      - name: Generate native Android project
+        run: npx expo prebuild --platform android
+
+      - name: Build Release APK (arm64-v8a, debug-signed)
+        working-directory: android
+        run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: rn-geolocation-timing-smankusors-arm64-v8a-release
+          path: android/app/build/outputs/apk/release/*.apk
+          retention-days: 90
+          if-no-files-found: error
